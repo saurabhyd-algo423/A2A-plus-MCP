@@ -1,0 +1,82 @@
+services:
+  # MCP Search Server
+  search-server:
+    build: .
+    command: uv run python mcp_server/sse/search_server.py --port 8090
+    ports:
+      - "8090:8090"
+    env_file: .env
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/sse')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # MCP Stocks Server
+  stocks-server:
+    build: .
+    command: uv run python mcp_server/sse/stocks_server.py
+    ports:
+      - "8181:8181"
+    env_file: .env
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8181/sse')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Stock Report Agent
+  stock-agent-server:
+    build: .
+    command: uv run python a2a_servers/agent_servers/stock_report_agent_server.py
+    ports:
+      - "10000:10000"
+    env_file: .env
+    environment:
+      - STOCKS_MCP_URL=http://stocks-server:8181/sse
+    depends_on:
+      stocks-server:
+        condition: service_healthy
+
+  # Google Search Agent
+  gsearch-agent-server:
+    build: .
+    command: uv run python a2a_servers/agent_servers/gsearch_report_agent_server.py
+    ports:
+      - "11000:11000"
+    env_file: .env
+    environment:
+      - SEARCH_MCP_URL=http://search-server:8090/sse
+    depends_on:
+      search-server:
+        condition: service_healthy
+
+  # Host Agent
+  host-agent-server:
+    build: .
+    command: uv run python a2a_servers/agent_servers/host_agent_server.py
+    ports:
+      - "12000:12000"
+    env_file: .env
+    environment:
+      - GSEARCH_AGENT_URL=http://gsearch-agent-server:11000/google_search_agent
+      - STOCK_AGENT_URL=http://stock-agent-server:10000/stock_agent
+    depends_on:
+      stock-agent-server:
+        condition: service_started
+      gsearch-agent-server:
+        condition: service_started
+
+  # Streamlit Frontend
+  streamlit-ui:
+    build: .
+    command: uv run streamlit run a2a_servers/stock_report_expert.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "3000:8501"
+    env_file: .env
+    environment:
+      - HOST_AGENT_URL=http://host-agent-server:12000/host_agent
+    depends_on:
+      - host-agent-server
