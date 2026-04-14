@@ -20,6 +20,13 @@ services:
     ports:
       - "8181:8181"
     env_file: .env
+    environment:
+      - OPENBLAS_NUM_THREADS=1
+      - OMP_NUM_THREADS=1
+      - MKL_NUM_THREADS=1
+      - NUMEXPR_NUM_THREADS=1
+    security_opt:
+      - seccomp:unconfined
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8181/sse')"]
       interval: 5s
@@ -36,6 +43,8 @@ services:
     env_file: .env
     environment:
       - STOCKS_MCP_URL=http://stocks-server:8181/sse
+    security_opt:
+      - seccomp:unconfined
     depends_on:
       stocks-server:
         condition: service_healthy
@@ -49,6 +58,8 @@ services:
     env_file: .env
     environment:
       - SEARCH_MCP_URL=http://search-server:8090/sse
+    security_opt:
+      - seccomp:unconfined
     depends_on:
       search-server:
         condition: service_healthy
@@ -72,11 +83,13 @@ services:
   # Streamlit Frontend
   streamlit-ui:
     build: .
-    command: uv run streamlit run a2a_servers/stock_report_expert.py --server.port 8501 --server.address 0.0.0.0
+    command: uv run streamlit run a2a_servers/stock_report_expert.py --server.port 8501 --server.address 0.0.0.0 --server.fileWatcherType none --browser.gatherUsageStats false
     ports:
       - "3000:8501"
     env_file: .env
     environment:
       - HOST_AGENT_URL=http://host-agent-server:12000/host_agent
+    security_opt:
+      - seccomp:unconfined
     depends_on:
       - host-agent-server
