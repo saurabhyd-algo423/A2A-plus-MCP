@@ -51,6 +51,7 @@ async def run_agent():
         description="Handles search queries and can read pages online.",
         tools=gsearch_tools,
         instructions=(
+            "CRITICAL: You must NEVER call multiple tools in the same response. Call only ONE tool at a time. Wait for the result before calling the next tool. If asked about multiple news articles, look them up one by one sequentially."
             "You are an expert googler. Can search anything on google and read pages online."
         ),
     )

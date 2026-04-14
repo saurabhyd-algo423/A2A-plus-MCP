@@ -46,10 +46,6 @@ class ADKAgent:
         :param tools: The tools the agent can use.
         :param remote_agent_addresses: The addresses of the remote agents.
         """
-        # list_urls = [
-        # "http://localhost:11000/google_search_agent",
-        # "http://localhost:10000/stock_agent",
-        # ]
         self.task_callback = task_callback
         if is_host_agent:
             import time
@@ -101,19 +97,9 @@ class ADKAgent:
         )
 
 
-
     async def invoke(self, query, session_id) -> str:
-        """
-        Invokes the agent with the given query and session ID.
-        :param query: The query to send to the agent.
-        :param session_id: The session ID to use for the agent.
-        :return:  The response from the agent.
-        """
         session = self._runner.session_service.get_session(
             app_name=self._agent.name, user_id=self._user_id, session_id=session_id
-        )
-        content = types.Content(
-            role="user", parts=[types.Part.from_text(text=query)]
         )
         if session is None:
             session = self._runner.session_service.create_session(
@@ -122,23 +108,28 @@ class ADKAgent:
                 state={},
                 session_id=session_id,
             )
-        events_async = self._runner.run_async(
-            session_id=session.id, user_id=session.user_id, new_message=content
+
+        content = types.Content(
+            role="user", parts=[types.Part.from_text(text=query)]
         )
 
-        events = []
-        max_events = 20  # safeguard against infinite loops
-
-        async for event in events_async:
+        final_response = ""
+        async for event in self._runner.run_async(
+            session_id=session.id,
+            user_id=session.user_id,
+            new_message=content,
+        ):
             print(event)
-            events.append(event)
-            if len(events) >= max_events:
+            if event.is_final_response():
+                if event.content and event.content.parts:
+                    final_response = "\n".join(
+                        p.text for p in event.content.parts if p.text
+                    )
                 break
 
-        if not events or not events[-1].content or not events[-1].content.parts:
-            return ""
-        return "\n".join([p.text for p in events[-1].content.parts if p.text])
+        return final_response
 
+        
     async def stream(self, query, session_id) -> AsyncIterable[Dict[str, Any]]:
         """
         Streams the response from the agent for the given query and session ID.
@@ -193,22 +184,19 @@ class ADKAgent:
             instructions: str,
             tools: List[Any],
     ) -> LlmAgent:
-        """
-        Builds the LLM agent for the reimbursement agent.
-
-        :param model: The model to use for the agent.
-        :param name: The name of the agent.
-        :param description: The description of the agent.
-        :param instructions: The instructions for the agent.
-        :param tools: The tools the agent can use.
-        :return: The LLM agent.
-        """
         return LlmAgent(
             model=model,
             name=name,
             description=description,
             instruction=instructions,
             tools=tools,
+            generate_content_config=types.GenerateContentConfig(
+                tool_config=types.ToolConfig(
+                    function_calling_config=types.FunctionCallingConfig(
+                        mode="ANY",  # forces the model to call tools one at a time
+                    )
+                )
+            ),
         )
 
 
@@ -224,21 +212,24 @@ class ADKAgent:
     def root_instruction(self) -> str:
         return f"""You are an expert delegator. You delegate user requests to remote agents and return their results.
 
-Available agents:
-{self.agents}
+                Available agents:
+                {self.agents}
+                CRITICAL: You must NEVER call multiple tools in the same response. 
+                            Call only ONE tool at a time. Wait for the result before calling the next tool.
+                            If asked about multiple stocks, look them up one by one sequentially.
 
-Workflow:
-1. Read the user request.
-2. Call `send_task` for each relevant agent. You may call multiple agents in one step.
-3. Once you receive the results from the agents, IMMEDIATELY return a final text response that summarizes the results. Do NOT call any more tools after receiving results.
+                Workflow:
+                1. Read the user request.
+                2. Call `send_task` for each relevant agent. You may call multiple agents in one step.
+                3. Once you receive the results from the agents, IMMEDIATELY return a final text response that summarizes the results. Do NOT call any more tools after receiving results.
 
-IMPORTANT RULES:
-- Call only ONE agent at a time. Wait for its result before calling the next agent.
-- NEVER call the same agent twice for the same request.
-- NEVER call any tool after you have received ALL results. Just respond with text.
-- Include which agent handled which part of the response.
-- Only use `send_task` — the `tool_context` parameter is handled automatically, do NOT pass it.
-"""
+                IMPORTANT RULES:
+                - Call only ONE agent at a time. Wait for its result before calling the next agent.
+                - NEVER call the same agent twice for the same request.
+                - NEVER call any tool after you have received ALL results. Just respond with text.
+                - Include which agent handled which part of the response.
+                - Only use `send_task` — the `tool_context` parameter is handled automatically, do NOT pass it.
+                """
 
     def check_state(self, context: ReadonlyContext):
         state = context.state

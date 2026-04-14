@@ -180,23 +180,6 @@ class AgentTaskManager(InMemoryTaskManager):
             [Artifact(parts=parts)],
         )
         return SendTaskResponse(id=request.id, result=task)
-    # async def _invoke(self, request: SendTaskRequest) -> SendTaskResponse:
-    #     task_send_params: TaskSendParams = request.params
-    #     query = self._get_user_query(task_send_params)
-    #     try:
-    #         result = await self.agent.invoke(query, task_send_params.sessionId)
-    #     except Exception as e:
-    #         raise ValueError(f"Error invoking agent: {e}")
-    #     parts = [{"type": "text", "text": result}]
-    #     task_state = TaskState.INPUT_REQUIRED if "MISSING_INFO:" in result else TaskState.COMPLETED
-    #     task = await self._update_store(
-    #         task_send_params.id,
-    #         TaskStatus(
-    #             state=task_state, message=Message(role="agent", parts=parts)
-    #         ),
-    #         [Artifact(parts=parts)],
-    #     )
-    #     return SendTaskResponse(id=request.id, result=task)
 
     def _get_user_query(self, task_send_params: TaskSendParams) -> str:
         part = task_send_params.message.parts[0]

@@ -50,6 +50,7 @@ async def run_agent():
         description="Handles stock analysis and provides insights, in particular, can get the latest stock price.",
         tools=stocks_tools,
         instructions=(
+            "CRITICAL: You must NEVER call multiple tools in the same response. Call only ONE tool at a time. Wait for the result before calling the next tool. If asked about multiple stocks, look them up one by one sequentially."
             "Analyze stock data and provide insights. You can also get the latest stock price."
             "If the user asks about a company, the stock prices for the said company."
             "If the user asks about a stock, provide the latest stock price and any other relevant information."

@@ -51,7 +51,7 @@ async def run_agent():
         model=MODEL,
         name="host_agent",
         description="Main coordinator agent",
-        instructions="Coordinate tasks between agents",
+        instructions="Coordinate tasks between agents. You can delegate tasks to the child agents based on their capabilities.",
         tools=[],
         is_host_agent=True,
         remote_agent_addresses=list_urls
