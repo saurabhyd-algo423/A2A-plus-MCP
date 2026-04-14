@@ -4,6 +4,8 @@ import traceback
 import logging
 from uuid import uuid4
 import sys, os
+import nest_asyncio
+nest_asyncio.apply()
 
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if root_dir not in sys.path:
@@ -148,7 +150,8 @@ def call_agent(user_text: str):
         "message": Message(role="user", parts=[TextPart(text=user_text)]).model_dump(),
     }
     logger.info(f"Dispatching {task_id} → {SERVER_URL}")
-    return asyncio.run(A2AClient(url=SERVER_URL).send_task(payload=payload)), task_id, session_id
+    response = asyncio.run(A2AClient(url=SERVER_URL).send_task(payload=payload))
+    return response, task_id, session_id
 
 
 def render_result(response, session_id: str, agent_name: str) -> str | None:
